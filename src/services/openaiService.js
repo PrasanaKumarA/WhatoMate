@@ -5,6 +5,7 @@ class OpenAIService {
     constructor() {
         this.openai = new OpenAI({
             apiKey: config.OPENAI_API_KEY,
+            baseURL: 'https://integrate.api.nvidia.com/v1',
         });
 
         this.systemPrompt = `
@@ -36,7 +37,7 @@ If you don't know the answer, politely say so.
             messages.push({ role: "user", content: userMessage });
 
             const response = await this.openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
+                model: "meta/llama-3.1-8b-instruct",
                 messages: messages,
                 max_tokens: 150,
                 temperature: 0.7
