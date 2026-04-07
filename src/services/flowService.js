@@ -33,7 +33,7 @@ class FlowService {
 
             if (lowerText === 'pricing') {
                 const reply = "Our pricing starts at $9/month. Reply *Menu* to see other options.";
-                await whatsappService.sendTextMessage(fromPhone, reply);
+                // Let the WhatoMate CRM dispatch this to avoid duplicates
                 await crmService.saveMessage(fromPhone, 'bot', reply);
                 await whatomateService.sendOutgoingMessage(whatomateContactId, reply);
                 return;
@@ -41,7 +41,7 @@ class FlowService {
 
             if (lowerText === 'contact') {
                 const reply = "You can reach us at support@whatomate.com!";
-                await whatsappService.sendTextMessage(fromPhone, reply);
+                // Let the WhatoMate CRM dispatch this to avoid duplicates
                 await crmService.saveMessage(fromPhone, 'bot', reply);
                 await whatomateService.sendOutgoingMessage(whatomateContactId, reply);
                 return;
@@ -52,8 +52,7 @@ class FlowService {
             const history = await crmService.getRecentMessages(fromPhone, 5);
             const aiReply = await openaiService.generateReply(text, history);
 
-            // Send AI reply and save to DB
-            await whatsappService.sendTextMessage(fromPhone, aiReply);
+            // Save to DB and let WhatoMate CRM trigger the actual dispatch 
             await crmService.saveMessage(fromPhone, 'bot', aiReply);
             await whatomateService.sendOutgoingMessage(whatomateContactId, aiReply);
 
@@ -73,7 +72,8 @@ class FlowService {
 
         await whatsappService.sendInteractiveButtons(to, header, body, footer, buttons);
         await crmService.saveMessage(to, 'bot', 'Sent Interactive Menu');
-        await whatomateService.sendOutgoingMessage(whatomateContactId, '[Interactive Menu Sent]');
+        // We purposely skip WhatoMate sync here because the CRM does not natively support 
+        // interactive buttons and would dispatch the raw plaintext "[Interactive Menu Sent]" to the user.
     }
 }
 
