@@ -46,9 +46,10 @@ exports.processMessage = async (req, res) => {
                 if (message.type === 'text') textContent = message.text.body;
                 else if (message.type === 'interactive') textContent = message.interactive?.button_reply?.title || '';
 
-                const whatomateContactId = await whatomateService.syncIncoming(
-                    fromPhone, contactName, textContent
-                );
+                // 🔥 Fix: We MUST give flowService the contact ID so it can sync outbound replies.
+                // However, we CANNOT use `syncIncoming` because that creates a forced "outgoing" message on the CRM,
+                // causing the echo bug. Instead, we manually just fetch the contact ID without creating a message.
+                const whatomateContactId = await whatomateService.createOrFetchContact(fromPhone, contactName);  
 
                 // Call the flow router (pass whatomateContactId so replies can be synced too)
                 await flowService.handleIncomingMessage(fromPhone, message, user, whatomateContactId);
