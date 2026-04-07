@@ -97,25 +97,30 @@ class WhatomateService {
         const safeText = content || "[No text]";
         
         // 1. Try FIRST requested payload (minimal content)
+        // 1. Try FIRST requested payload (Nested content object with type)
         const payload1 = { 
-            content: safeText, 
+            type: 'text',
+            content: {
+                body: safeText
+            },
             direction: direction
         };
         
         console.log(`[DEBUG] POST ${url} payload:`, JSON.stringify(payload1));
-        console.log(`[DEBUG] typeof content:`, typeof safeText);
+        console.log(`[DEBUG] typeof content body:`, typeof safeText);
 
         try {
             const response = await axios.post(url, payload1, { headers: this.headers });
             console.log('[DEBUG] Message API response:', JSON.stringify(response.data, null, 2));
-            console.log(`✅ Synced ${direction} message to WhatoMate (payload1)`);
+            console.log(`✅ Synced ${direction} message to WhatoMate`);
             return response.data;
         } catch (error) {
             const errData1 = error.response?.data || error.message;
             console.error(`⚠️ Payload 1 failed:`, JSON.stringify(errData1));
             
-            // 2. Try SECOND requested payload (fallback to body)
+            // 2. Try SECOND payload (Flat structure with type)
             const payload2 = {
+                type: 'text',
                 body: safeText,
                 direction: direction
             };
