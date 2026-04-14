@@ -32,7 +32,7 @@ class FlowService {
             }
 
             if (lowerText === 'pricing') {
-                const reply = "Our pricing starts at $9/month. Reply *Menu* to see other options.";
+                const reply = "Our pricing starts at $10/month. Reply *Menu* to see other options.";
                 // Let the WhatoMate CRM dispatch this to avoid duplicates
                 await crmService.saveMessage(fromPhone, 'bot', reply);
                 await whatomateService.sendOutgoingMessage(whatomateContactId, reply);
@@ -64,7 +64,7 @@ class FlowService {
     async sendMenu(to, whatomateContactId = null) {
         const header = "Welcome to WhatoMate!";
         const body = "Please choose an option below:";
-        const footer = "Powered by AI";
+        const footer = "Powered by Tech4Good Community";
         const buttons = [
             { id: "btn_pricing", title: "Pricing" },
             { id: "btn_contact", title: "Contact" }
