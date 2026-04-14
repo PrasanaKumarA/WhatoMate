@@ -40,7 +40,7 @@ class FlowService {
             }
 
             if (lowerText === 'contact') {
-                const reply = "You can reach us at support@whatomate.com!";
+                const reply = "You can reach us at prasana@tech4goodcommunity.com";
                 // Let the WhatoMate CRM dispatch this to avoid duplicates
                 await crmService.saveMessage(fromPhone, 'bot', reply);
                 await whatomateService.sendOutgoingMessage(whatomateContactId, reply);
