@@ -34,32 +34,42 @@ exports.processMessage = async (req, res) => {
                 const fromPhone = message.from;
                 const contactName = contact?.profile?.name || 'User';
 
-                // Save or Fetch User in CRM
+                // Extract text properly based on message type
+                let textContent = '';
+                if (message.type === 'text') {
+                    textContent = message.text?.body || '';
+                } else if (message.type === 'interactive') {
+                    textContent = message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || '';
+                } else {
+                    textContent = `[Received ${message.type} message]`;
+                }
+
+                console.log(`\n[Webhook] Incoming message from ${fromPhone}: "${textContent}"`);
+
+                // 1. Local SQLite Sync
                 let user = await crmService.getUser(fromPhone);
                 if (!user) {
                     await crmService.createUser(fromPhone, contactName);
                     user = await crmService.getUser(fromPhone);
                 }
 
-                // 🔥 Sync Contact + Message to WhatoMate Dashboard
-                let textContent = '';
-                if (message.type === 'text') textContent = message.text.body;
-                else if (message.type === 'interactive') textContent = message.interactive?.button_reply?.title || '';
+                // 2. WhatoMate Sync (Contact & Incoming Message)
+                const whatomateContactId = await whatomateService.syncIncoming(fromPhone, contactName, textContent);
+                
+                if (!whatomateContactId) {
+                    console.warn(`[Webhook] Warning: whatomateContactId is null. Outbound syncs for this message will fail.`);
+                }
 
-                // 🔥 Fix: We MUST give flowService the contact ID so it can sync outbound replies.
-                // However, we CANNOT use `syncIncoming` because that creates a forced "outgoing" message on the CRM,
-                // causing the echo bug. Instead, we manually just fetch the contact ID without creating a message.
-                const whatomateContactId = await whatomateService.createOrFetchContact(fromPhone, contactName);  
-
-                // Call the flow router (pass whatomateContactId so replies can be synced too)
+                // 3. Process chatbot flow
+                // Flow router will handle outbound syncs using whatomateContactId
                 await flowService.handleIncomingMessage(fromPhone, message, user, whatomateContactId);
             }
         }
 
         // Always return 200 OK so Meta doesn't retry
-        return res.sendStatus(200);
+        return res.status(200).send('OK');
     } catch (error) {
         console.error('❌ Error processing webhook:', error);
-        return res.sendStatus(500);
+        return res.status(200).send('OK'); // Return 200 even on error to prevent Meta retries
     }
 };
