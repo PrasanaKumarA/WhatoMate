@@ -52,7 +52,8 @@ class WhatomateService {
         } catch (error) {
             const errData = error.response?.data || error.message;
             const errMsg = (typeof errData === 'object' ? errData?.message : errData) || '';
-            const isConflict = error.response?.status === 409 ||
+            const isConflict =
+                error.response?.status === 409 ||
                 errMsg.toLowerCase().includes('already exists') ||
                 errMsg.toLowerCase().includes('duplicate');
 
@@ -64,29 +65,51 @@ class WhatomateService {
         }
     }
 
-    async sendMessage(contactId, content, direction) {
+    /**
+     * Send a message to WhatoMate CRM.
+     * Correct payload format (verified against live API):
+     * {
+     *   whatsapp_account: "WhatoMate Bot",   <-- MUST match exactly what WhatoMate has stored
+     *   type: "text",
+     *   content: { body: "plain string" }
+     * }
+     *
+     * @param {string} contactId  - WhatoMate contact UUID
+     * @param {string} content    - Plain text message string
+     * @param {string} direction  - "inbound" | "outbound" (informational, API ignores it)
+     */
+    async sendMessage(contactId, content, direction = 'outbound') {
         if (!contactId) {
-            console.error(`[WhatoMate] Cannot send message: Missing contactId`);
+            console.error(`[WhatoMate] ❌ Cannot send message: Missing contactId`);
+            return null;
+        }
+
+        const safeContent = String(content || '[No text]').trim();
+        if (!safeContent) {
+            console.error(`[WhatoMate] ❌ Cannot send message: content is empty`);
             return null;
         }
 
         const url = `${this.apiUrl}/contacts/${contactId}/messages`;
-        
-        // Exact nested payload format expected by WhatoMate CRM
         const payload = {
-            whatsapp_account: config.WHATSAPP_ACCOUNT_NAME,
-            type: "text",
-            content: {
-                body: content || "[No text]"
-            }
+            whatsapp_account: config.WHATSAPP_ACCOUNT_NAME,  // must match CRM exactly
+            type: 'text',
+            content: { body: safeContent }
         };
+
+        // === DEBUG LOGGING ===
+        console.log(`\n🚀 [WhatoMate] Sending message [${direction}] to contactId: ${contactId}`);
+        console.log(`   URL    : ${url}`);
+        console.log(`   payload: ${JSON.stringify(payload)}`);
+        console.log(`   typeof content.body: ${typeof payload.content.body}`);
 
         try {
             const response = await axios.post(url, payload, { headers: this.headers });
-            console.log(`[WhatoMate] ✅ Synced outbound message successfully.`);
+            console.log(`✅ [WhatoMate] Sync success [${direction}]:`, JSON.stringify(response.data));
             return response.data;
         } catch (error) {
-            console.error(`[WhatoMate] ❌ Sync Error [outbound]:`, JSON.stringify(error.response?.data || error.message));
+            console.error(`❌ [WhatoMate] Sync Error [${direction}]:`, JSON.stringify(error.response?.data || error.message));
+            console.error(`   Sent payload was: ${JSON.stringify(payload)}`);
             return null;
         }
     }
@@ -112,13 +135,14 @@ class WhatomateService {
                 await this.forwardWebhook(webhookBody);
             }
 
-            // We still need to ensure the contact ID exists for outbound replies in the flow
+            // Ensure the contact exists for outbound replies
             const contactId = await this.createOrFetchContact(phone, name);
             if (!contactId) {
-                console.error(`[WhatoMate] Could not resolve contact ID for flow context`);
+                console.error(`[WhatoMate] Could not resolve contact ID for ${phone}`);
                 return null;
             }
 
+            console.log(`[WhatoMate] ✅ Contact resolved: ${contactId} for ${phone}`);
             return contactId;
         } catch (error) {
             console.error(`[WhatoMate] ❌ Incoming Sync Failed:`, error.message);
@@ -128,7 +152,10 @@ class WhatomateService {
 
     async sendOutgoingMessage(contactId, message) {
         try {
-            if (!message) return;
+            if (!message) {
+                console.warn('[WhatoMate] sendOutgoingMessage called with empty message — skipping.');
+                return;
+            }
             await this.sendMessage(contactId, message, 'outbound');
         } catch (error) {
             console.error(`[WhatoMate] ❌ Outgoing Sync Failed:`, error.message);

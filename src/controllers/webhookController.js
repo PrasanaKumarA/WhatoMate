@@ -16,61 +16,69 @@ exports.verifyWebhook = (req, res) => {
             return res.sendStatus(403);
         }
     }
-    return res.status(400).send("Bad Request");
+    return res.status(400).send('Bad Request');
 };
 
 exports.processMessage = async (req, res) => {
+    // Always return 200 first so Meta never retries
+    res.status(200).send('OK');
+
     try {
         const body = req.body;
 
-        if (body.object === 'whatsapp_business_account') {
-            const entry = body.entry?.[0];
-            const changes = entry?.changes?.[0];
-            const value = changes?.value;
-            const message = value?.messages?.[0];
-            const contact = value?.contacts?.[0];
+        if (body.object !== 'whatsapp_business_account') return;
 
-            if (message) {
-                const fromPhone = message.from;
-                const contactName = contact?.profile?.name || 'User';
+        const entry   = body.entry?.[0];
+        const changes = entry?.changes?.[0];
+        const value   = changes?.value;
 
-                // Extract text properly based on message type
-                let textContent = '';
-                if (message.type === 'text') {
-                    textContent = message.text?.body || '';
-                } else if (message.type === 'interactive') {
-                    textContent = message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || '';
-                } else {
-                    textContent = `[Received ${message.type} message]`;
-                }
+        // Skip status updates (delivery receipts, read receipts)
+        if (value?.statuses?.length) return;
 
-                console.log(`\n[Webhook] Incoming message from ${fromPhone}: "${textContent}"`);
+        const message = value?.messages?.[0];
+        const contact = value?.contacts?.[0];
 
-                // 1. Local SQLite Sync
-                let user = await crmService.getUser(fromPhone);
-                if (!user) {
-                    await crmService.createUser(fromPhone, contactName);
-                    user = await crmService.getUser(fromPhone);
-                }
+        if (!message) return;
 
-                // 2. WhatoMate Sync (Contact & Incoming Message)
-                // Forward the raw Meta webhook body to WhatoMate CRM for native inbound processing
-                const whatomateContactId = await whatomateService.syncIncoming(fromPhone, contactName, textContent, body);
-                
-                if (!whatomateContactId) {
-                    console.warn(`[Webhook] Warning: whatomateContactId is null. Outbound syncs for this message will fail.`);
-                }
+        const fromPhone   = message.from;
+        const contactName = contact?.profile?.name || 'User';
 
-                // 3. Process chatbot flow
-                // Flow router will handle outbound syncs using whatomateContactId
-                await flowService.handleIncomingMessage(fromPhone, message, user, whatomateContactId);
-            }
+        // ── Extract text from all supported message types ──────────────────
+        let textContent = '';
+        if (message.type === 'text') {
+            textContent = message.text?.body || '';
+        } else if (message.type === 'interactive') {
+            textContent =
+                message.interactive?.button_reply?.title ||
+                message.interactive?.list_reply?.title  ||
+                '';
+        } else {
+            textContent = `[Received ${message.type} message]`;
         }
 
-        // Always return 200 OK so Meta doesn't retry
-        return res.status(200).send('OK');
+        console.log(`\n[Webhook] Incoming message from ${fromPhone}: "${textContent}"`);
+
+        // 1. Local SQLite Sync
+        let user = await crmService.getUser(fromPhone);
+        if (!user) {
+            await crmService.createUser(fromPhone, contactName);
+            user = await crmService.getUser(fromPhone);
+        }
+
+        // 2. WhatoMate Sync — forward raw webhook + resolve contact ID
+        const whatomateContactId = await whatomateService.syncIncoming(
+            fromPhone, contactName, textContent, body
+        );
+
+        if (!whatomateContactId) {
+            console.warn(`[Webhook] ⚠️  whatomateContactId is null for ${fromPhone}. Outbound syncs will be skipped.`);
+        }
+
+        // 3. Process chatbot flow & send bot reply
+        await flowService.handleIncomingMessage(fromPhone, message, user, whatomateContactId);
+
     } catch (error) {
         console.error('❌ Error processing webhook:', error);
-        return res.status(200).send('OK'); // Return 200 even on error to prevent Meta retries
+        // 200 already sent above — no action needed
     }
 };

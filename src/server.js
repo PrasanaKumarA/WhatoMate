@@ -1,23 +1,37 @@
-const express = require("express");
-const config = require("./config");
-const webhookRoutes = require("./routes/webhook");
+'use strict';
 
-// Initialize Database
-require("./config/db");
+require('dotenv').config();
 
+const express = require('express');
+const config  = require('./config');
+
+// ── Bootstrap database (creates tables if missing) ───────────────────────────
+require('./config/db');
+
+// ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
 
-// Middleware to parse JSON payloads
 app.use(express.json());
 
-// Main Webhook Route
-app.use("/webhook", webhookRoutes);
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/webhook', require('./routes/webhook'));
 
-// Health check endpoint
-app.get("/", (req, res) => {
-    res.send("WhatoMate Bot is running! 🚀");
+// Health check
+app.get('/', (_req, res) => res.send('WhatoMate Bot is running! 🚀'));
+
+// ── Global 404 handler ────────────────────────────────────────────────────────
+app.use((_req, res) => {
+    res.status(404).json({ status: 'error', message: 'Not found' });
 });
 
+// ── Global error handler ──────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+    console.error('❌ Unhandled server error:', err);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+});
+
+// ── Start server ──────────────────────────────────────────────────────────────
 app.listen(config.PORT, () => {
-    console.log(`Server is running on port ${config.PORT} 🚀`);
+    console.log(`✅ WhatoMate server running on port ${config.PORT}`);
 });
