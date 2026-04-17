@@ -39,9 +39,9 @@ class CRMService {
 
     getRecentMessages(phone, limit = 10) {
         return new Promise((resolve, reject) => {
-            db.all(`SELECT role, content FROM messages WHERE phone = ? ORDER BY created_at ASC LIMIT ?`, [phone, limit], (err, rows) => {
+            db.all(`SELECT role, content FROM messages WHERE phone = ? ORDER BY created_at DESC LIMIT ?`, [phone, limit], (err, rows) => {
                 if (err) reject(err);
-                resolve(rows || []);
+                resolve((rows || []).reverse());
             });
         });
     }
