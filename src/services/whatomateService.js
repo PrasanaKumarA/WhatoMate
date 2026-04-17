@@ -72,33 +72,53 @@ class WhatomateService {
 
         const url = `${this.apiUrl}/contacts/${contactId}/messages`;
         
-        // Exact payload format expected by WhatoMate CRM
+        // Exact nested payload format expected by WhatoMate CRM
         const payload = {
-            content: content || "[No text]",
-            direction: direction
+            whatsapp_account: config.WHATSAPP_ACCOUNT_NAME,
+            type: "text",
+            content: {
+                body: content || "[No text]"
+            }
         };
 
         try {
             const response = await axios.post(url, payload, { headers: this.headers });
-            console.log(`[WhatoMate] ✅ Synced ${direction} message successfully.`);
+            console.log(`[WhatoMate] ✅ Synced outbound message successfully.`);
             return response.data;
         } catch (error) {
-            console.error(`[WhatoMate] ❌ Sync Error [${direction}]:`, JSON.stringify(error.response?.data || error.message));
+            console.error(`[WhatoMate] ❌ Sync Error [outbound]:`, JSON.stringify(error.response?.data || error.message));
             return null;
         }
     }
 
-    async syncIncoming(phone, name, textContent) {
+    async forwardWebhook(body) {
+        if (!this.apiUrl) return;
+        const url = `${this.apiUrl}/webhook`;
         try {
+            console.log(`[WhatoMate] Forwarding raw inbound webhook to CRM...`);
+            await axios.post(url, body, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            console.log(`[WhatoMate] ✅ Successfully forwarded inbound webhook.`);
+        } catch (error) {
+            console.error(`[WhatoMate] ❌ Failed to forward webhook:`, JSON.stringify(error.response?.data || error.message));
+        }
+    }
+
+    async syncIncoming(phone, name, textContent, webhookBody) {
+        try {
+            // Forward the raw webhook to the CRM to handle inbound messaging natively
+            if (webhookBody) {
+                await this.forwardWebhook(webhookBody);
+            }
+
+            // We still need to ensure the contact ID exists for outbound replies in the flow
             const contactId = await this.createOrFetchContact(phone, name);
             if (!contactId) {
-                console.error(`[WhatoMate] Could not resolve contact ID for incoming sync`);
+                console.error(`[WhatoMate] Could not resolve contact ID for flow context`);
                 return null;
             }
 
-            if (textContent) {
-                await this.sendMessage(contactId, textContent, 'inbound');
-            }
             return contactId;
         } catch (error) {
             console.error(`[WhatoMate] ❌ Incoming Sync Failed:`, error.message);

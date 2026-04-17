@@ -9,4 +9,5 @@ module.exports = {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     WHATOMATE_API_URL: process.env.WHATOMATE_API_URL || "http://127.0.0.1:8080/api",
     WHATOMATE_API_KEY: process.env.WHATOMATE_API_KEY,
+    WHATSAPP_ACCOUNT_NAME: process.env.WHATSAPP_ACCOUNT_NAME || "Whatomate bot",
 };

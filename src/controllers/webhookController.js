@@ -54,7 +54,8 @@ exports.processMessage = async (req, res) => {
                 }
 
                 // 2. WhatoMate Sync (Contact & Incoming Message)
-                const whatomateContactId = await whatomateService.syncIncoming(fromPhone, contactName, textContent);
+                // Forward the raw Meta webhook body to WhatoMate CRM for native inbound processing
+                const whatomateContactId = await whatomateService.syncIncoming(fromPhone, contactName, textContent, body);
                 
                 if (!whatomateContactId) {
                     console.warn(`[Webhook] Warning: whatomateContactId is null. Outbound syncs for this message will fail.`);
